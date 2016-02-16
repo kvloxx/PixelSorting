@@ -13,8 +13,12 @@ public class PixelSorting extends PApplet {
 	// String imgFileName = "glitch_art_small";
 	// String imgFileName = "outputthing";
 	// String imgFileName = "cat";
-//	String imgFileName = "Be-a-Communist-Step-20";
-	 String imgFileName = "dumbDolphinCropped";
+	//	String imgFileName = "Be-a-Communist-Step-20";
+	//	 String imgFileName = "dumbDolphinCropped";
+	//	String imgFileName= "811";
+	String imgFileName = "811cropped";
+	//	String imgFileName = "zb";
+	//	String imgFileName= "^919F27CE94C1471A239CB8C49833235B9FF14F71BA1B7EB498^pimgpsh_fullsize_distr";
 	String fileType = "jpg";
 
 	public void settings() {
@@ -25,88 +29,131 @@ public class PixelSorting extends PApplet {
 		img = loadImage(imgFileName + "." + fileType);
 		ref = loadImage(imgFileName + "." + fileType);
 		surface.setSize(img.width, img.height);
+
 	}
 
 	public void draw() {
 
 		//		rangeRowSort(2);
-//		rowSort();
+		//		rowSort();
 		streakSort();
+		//		rangeRowSort(8);
 		image(img, 0, 0);
-		noLoop();
+		//		noLoop();
 
 		//		//Save every other frame as jpg (for gif making)
 		//		if (frameCount % 2 == 0 && frameCount < 150)
 		//			saveFrame(frameCount + ".jpg");
+		saveFrame("deeny.jpg");
+		noLoop();
 	}
 
 	void streakSort() {
 		img.loadPixels();
 		ArrayList<CCielabPix> pixels = new ArrayList<>();	//pxs in active columns from latest row
 		ArrayList<CCielabPix> prev = new ArrayList<>();	//pxs from row above (minus one that became locked)
-		boolean[] locked=new boolean[img.width];		//whether column index still participates in sorting or is locked
-		
+		boolean[] locked = new boolean[img.width];		//whether column index still participates in sorting or is locked
+
 		for (int i = 0; i < locked.length; i++) {	//all columns initially participate
-			locked[i]=false;
+			locked[i] = false;
 		}
-		
-		for (int row = 0; row < img.height; row++) {
-			//assign pixels array from last iteration as this generation's prev 
+
+		for (int row = 0; row < img.width; row++) {
+			//assign pixels array from last iteration as this generation's prev
 			//and prepare the old prev to recieve the current row of pxs
-			ArrayList<CCielabPix> tmp = pixels;	
+			ArrayList<CCielabPix> tmp = pixels;
 			pixels = prev;
 			prev = tmp;
 			pixels.clear();
-			
+
 			for (int i = 0; i < img.width; i++) {	//fill pixels array with pxs from participating columns only
-				if(!locked[i]) {
+				if (!locked[i]) {
 					pixels.add(new CCielabPix(this, img.pixels[row * img.width + i]));
-					
-					if(row==0) {	//for first row, prev will store pxs in their orig order
+
+					if (row == 0) {	//for first row, prev will store pxs in their orig order
 						prev.add(new CCielabPix(this, img.pixels[row * img.width + i]));
 					}
 				}
 			}
-			
-			if(pixels.isEmpty()) {	//return if no columns are active
+
+			if (pixels.isEmpty()) {	//return if no columns are active
 				img.updatePixels();
 				return;
 			}
 
-			pixels.sort(Comparator.comparing((c) -> (hue(c.rgb))));
-			
+			pixels.sort(Comparator.comparing(this::chue).thenComparing(this::csat));
+
 			//calculate dE between current and prev color for all non-locked pxs
 			//record the dE and index (in both lists) of the active pxl whose color changed least(lowest dE)
-			double minDeltaE=pixels.get(0).deltaE(prev.get(0));	
-			int indexToLock=0;
-			int indexToRemove=0;
-			int j=0;
+			double minDeltaE = pixels.get(0).deltaE(prev.get(0));
+			int indexToLock = 0;
+			int indexToRemove = 0;
+			double equalPixelCount = 0;
+			int j = 0;
+			System.out.println("PIX: " + pixels.size() + ", PREV: " + prev.size());
+			System.out.println();
 			for (int i = 0; i < locked.length; i++) {
-				if(!locked[i]){
-					double dE=pixels.get(j).deltaE(prev.get(0));
-					if(dE<minDeltaE){
-						minDeltaE=dE;
-						indexToLock=i;
-						indexToRemove=j;
+				if (!locked[i]) {
+					double dE = pixels.get(j).deltaE(prev.get(j));
+					if (dE < minDeltaE) {
+						minDeltaE = dE;
+						indexToLock = i;
+						indexToRemove = j;
+						equalPixelCount = 1;
+					} else {
+						if (dE == minDeltaE) {	//randomize which column with same dE is locked
+							equalPixelCount++;
+							double prob = 1. / equalPixelCount;
+							double draw = Math.random();
+							if (draw <= prob) {
+								System.out.println("CHOSEN!");
+								indexToLock = i;
+								indexToRemove = j;
+							}
+						}
 					}
 					j++;
 				}
 			}
-			
-			//pass through row again, updating active pxl colors according to sorted order
+
+			//pass through row again, updating active px colors according to sorted order
 			//skip over columns that are no longer participating
-			j=0;
+			j = 0;
 			for (int i = 0; i < locked.length; i++) {
-				if(!locked[i]){
-					img.pixels[row * img.width + i]=pixels.get(j).rgb;
+				if (!locked[i]) {
+					img.pixels[row * img.width + i] = pixels.get(j).rgb;
 					j++;
 				}
 			}
-			
-			locked[indexToLock]=true;	//lock column that changed least
+
+			locked[indexToLock] = true;	//lock column that changed least
 			pixels.remove(indexToRemove);	//remove locked px from active pxs list
 		}
 		img.updatePixels();
+	}
+
+	double chue(CCielabPix c) {
+		return hue(c.rgb);
+	}
+
+	double csat(CCielabPix c) {
+		return saturation(c.rgb);
+	}
+
+	double cbri(CCielabPix c) {
+		return brightness(c.rgb);
+	}
+
+	double cred(CCielabPix c) {
+		return red(c.rgb);
+	}
+
+	double cgre(CCielabPix c) {
+		return green(c.rgb);
+	}
+
+	double cblu(CCielabPix c) {
+		return blue(c.rgb);
 	}
 
 	void rowSort() {
@@ -116,7 +163,8 @@ public class PixelSorting extends PApplet {
 			for (int i = 0; i < img.width; i++) {
 				pixels.add(img.pixels[row * img.width + i]);
 			}
-			pixels.sort(Comparator.comparing(this::hue));
+			pixels.sort(
+					Comparator.comparing(this::hue).thenComparing(this::saturation).thenComparing(this::brightness));
 			for (int i = 0; i < img.width; i++) { // prime the subsequence array
 				img.pixels[row * img.width + i] = pixels.get(i);
 			}
@@ -139,7 +187,9 @@ public class PixelSorting extends PApplet {
 			for (int x = 0; x < img.width; x++) {
 				// Collections.sort(subseq,
 				// Comparator.comparing(this::hue).thenComparing(this::saturation).thenComparing(this::brightness));
-				window.sort(Comparator.comparing((c) -> (-this.brightness(c))));
+				//				window.sort(Comparator.comparing((c) -> (-this.brightness(c))));
+				window.sort(Comparator.comparing(this::hue).thenComparing(this::saturation)
+						.thenComparing(this::brightness));
 				img.pixels[row * img.width + x] = window.get(0);
 				if ((x + range) < img.width)
 					window.set(0, img.pixels[row * img.width + (x + range) % img.width]);
